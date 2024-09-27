@@ -7,3 +7,6 @@ export const hashPassword = async (password: string): Promise<string> =>{
 }
 
 //lEER Y COMPRAR EL HAS EN LA BD
+export const comparePassword = async (password: string, hash: string): Promise<boolean>=>{
+    return await bcrypt.compare(password,hash)
+}

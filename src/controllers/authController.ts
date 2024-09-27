@@ -1,27 +1,79 @@
-import { Request, Response } from "express"
-import { hashPassword } from "../services/password.service"
-import prisma from '../models/user'
-import { generateToken } from "../services/auth.service"
+import { Request, Response } from "express";
+import { comparePassword, hashPassword } from "../services/password.service";
+import prisma from "../models/user";
+import { generateToken } from "../services/auth.service";
 
-export const register = async(req: Request,res: Response):Promise<void> =>{
-    const {email, password} = req.body
-    try {
-        const hasedPassword= await hashPassword(password)
-        const user= await prisma.create(
-            {
-                data: {
-                    email,
-                    password: hasedPassword
-                }
-            }
-        )
-        const token = generateToken(user)
-        res.status(201).json({token})
-    } catch (error) {
-        console.log(error)
-        res.status(500).json({
-            error: 'Hubo un error en el registro'
+export const register = async (req: Request, res: Response): Promise<void> => {
+  const { email, password } = req.body;
+  try {
+    if (!email) {
+        res.status(400).json({
+            message: "El email es obligatorio"
         })
+        return
+    }
+    if (!password) {
+        res.status(400).json({
+            message: "El password es obligatorio"
+        })
+        return
+    }
+    const hasedPassword = await hashPassword(password);
+    const user = await prisma.create({
+      data: {
+        email,
+        password: hasedPassword,
+      },
+    });
+    const token = generateToken(user);
+    res.status(201).json({ token });
+  } catch (error: any) {
+
+    if (error?.code === "P2002" && error?.meta?.target?.includes("email")) {
+      res.status(400).json({
+        message: "El mail ingresado ya existe",
+      });
     }
 
-}
+    console.log(error);
+    res.status(500).json({
+      error: "Hubo un error en el registro",
+    });
+  }
+};
+
+export const login = async (req: Request, res: Response): Promise<void> => {
+  const { email, password } = req.body;
+  try {
+
+    if (!email) {
+        res.status(400).json({
+            message: "El email es obligatorio"
+        })
+        return
+    }
+    if (!password) {
+        res.status(400).json({
+            message: "El password es obligatorio"
+        })
+        return
+    }
+
+    const user = await prisma.findUnique({ where: { email } });
+    if (!user) {
+      res.status(404).json({
+        error: "Error no encontrado",
+      })
+      return
+    }
+
+    const passwordMatch = await comparePassword(password, user.password);
+    if(!passwordMatch){
+        res.status(401).json({error:'Usuario y contraseña no coinciden'})
+    }
+    const token = generateToken(user);
+    res.status(200).json({ token });
+  } catch (error) {
+    console.log('Error: ', error)
+  }
+};
